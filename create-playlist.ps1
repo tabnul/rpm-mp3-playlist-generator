@@ -30,7 +30,7 @@ $files=Get-Childitem $trackfolderLocation -Recurse | where { ! $_.PSIsContainer 
 
         $trackNumber=$trackRow.track
         $trackAmount=$trackRow.amount
-        $numberedTracks=$files | where {$_.name -like "$tracknumber*"}
+        $numberedTracks=$files | where {$_.name -like "$tracknumber*" -and $_.FullName -notin $copiedTracks}
 
         DO {     
 
