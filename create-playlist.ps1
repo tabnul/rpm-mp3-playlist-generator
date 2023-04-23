@@ -19,36 +19,25 @@ $copiedTracks= @()
 
 
 $files=Get-Childitem $trackfolderLocation -Recurse | where { ! $_.PSIsContainer }
+while ($playlistStartNumberCounter -le $amountOfPlaylists) {
 
- while ($playlistStartNumberCounter -le $amountOfPlaylists) {
+  $playlistStartNumberString=$playliststartNumberCounter.ToString()
+  $currentPlaylistLocation=$playlistFolderLocation + $playliststartNumberString
 
-    $playlistStartNumberString=$playliststartNumberCounter.ToString()
-    $currentPlaylistLocation=$playlistFolderLocation + $playliststartNumberString
-    
-    
-    foreach ($trackRow in $trackArray){
+  foreach ($trackRow in $trackArray){
+    $trackNumber=$trackRow.track
+    $trackAmount=$trackRow.amount
+    $numberedTracks=$files | where {$_.name -like "$tracknumber*" -and $_.FullName -notin $copiedTracks}
 
-        $trackNumber=$trackRow.track
-        $trackAmount=$trackRow.amount
-        $numberedTracks=$files | where {$_.name -like "$tracknumber*" -and $_.FullName -notin $copiedTracks}
-
-        DO {     
-
-            $randomTracks = Get-Random -InputObject $numberedTracks -Count $trackAmount
-            
-           Write-Host "Random track selected: " $randomTracks.name
-           } 
-           until ($randomTracks.FullName -notin $copiedTracks)
-     }
-            }
-    
-    
-    $playliststartNumberCounter ++
-    }  
-            foreach ($track in $randomTracks){
-                Copy-Item -LiteralPath $track.FullName -Destination $currentPlaylistLocation
-                $copiedTracks += $track.FullName
-                
-        
-    Write-Host $copiedTracks.FullName
-
+    DO {     
+      $randomTracks = Get-Random -InputObject $numberedTracks -Count $trackAmount
+    } 
+    until ($randomTracks.FullName -notin $copiedTracks)
+  foreach ($track in $randomTracks){
+    Copy-Item -LiteralPath $track.FullName -Destination $currentPlaylistLocation
+    $copiedTracks += $track.FullName   
+    Write-Host "Random track selected: " $randomTracks.name
+    }
+  }
+  $playliststartNumberCounter ++
+}   
