@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPM Playlists</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1d232b; --muted:#6b7480; --line:#e2e5ea; --accent:#d9480f; --ok:#2b8a3e; --warn:#b35c00; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171b; --card:#1d2127; --fg:#e8eaed; --muted:#9aa3ad; --line:#2e343c; --accent:#ff7a3d; --ok:#69db7c; --warn:#ffa94d; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:860px; margin:0 auto; padding:16px; }
+  h1 { font-size:1.4rem; margin:8px 0 16px; } h2 { font-size:1.05rem; margin:0 0 12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  label { display:block; color:var(--muted); font-size:.85rem; margin-bottom:4px; }
+  input[type=text], input[type=number] { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; } .row > div { flex:1 1 140px; }
+  .check { display:flex; align-items:center; gap:8px; color:var(--fg); font-size:.95rem; margin:10px 0 0; }
+  button { font:inherit; padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  table { width:100%; border-collapse:collapse; } td, th { padding:4px 6px; text-align:left; } th { color:var(--muted); font-weight:500; font-size:.85rem; }
+  .flash { padding:8px 12px; border-radius:6px; margin-bottom:12px; border:1px solid var(--line); }
+  .flash.ok { color:var(--ok); } .flash.error, .warn { color:var(--warn); }
+  .playlists { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; }
+  .pl ol { margin:0; padding-left:20px; } .pl li span { color:var(--muted); }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>RPM Playlist Generator</h1>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in msgs %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  {% endwith %}
+
+  <section class="card">
+    <h2>Generate</h2>
+    <form method="post" action="/generate">
+      <div class="row">
+        <div><label for="count">Number of playlists</label><input id="count" name="count" type="number" min="1" max="999" value="15"></div>
+        <div><label for="prefix">Name prefix</label><input id="prefix" name="prefix" type="text" value="RPM"></div>
+      </div>
+      <label class="check"><input type="checkbox" name="replace" value="1" checked> Replace existing playlists with this prefix (otherwise add new ones)</label>
+      <label class="check"><input type="checkbox" name="rescan" value="1" checked> Ask Lyrion to rescan playlists afterwards</label>
+      <p><button class="primary" type="submit">Generate playlists</button></p>
+    </form>
+    {% if playlists %}<p class="muted">Existing: {{ playlists|join(", ") }}</p>{% endif %}
+  </section>
+
+  {% if results is defined %}
+  <section class="card">
+    <h2>Result</h2>
+    <p class="muted">Scanned {{ scanned }} audio files. Created {{ results|length }} playlists.{% if rescan_msg %} {{ rescan_msg }}.{% endif %}</p>
+    {% for w in warnings %}<div class="warn">⚠ {{ w }}</div>{% endfor %}
+    <div class="playlists">
+      {% for pl in results %}
+      <div class="pl"><strong>{{ pl.name }}</strong>
+        <ol>{% for t in pl.tracks %}<li><span>{{ t.slot }}</span> {{ t.name }}</li>{% endfor %}</ol>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>Class structure</h2>
+    <p class="muted">Track number (file names must start with it) and how many tracks to pick, in playing order.</p>
+    <form method="post" action="/structure">
+      <table>
+        <thead><tr><th>Track</th><th>Amount</th><th></th></tr></thead>
+        <tbody id="rows">
+          {% for r in structure %}
+          <tr><td><input type="text" name="track" value="{{ r.track }}"></td><td><input type="number" name="amount" min="1" value="{{ r.amount }}"></td><td><button type="button" onclick="this.closest('tr').remove()">✕</button></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p><button type="button" onclick="addRow()">+ Add row</button> <button type="submit">Save structure</button></p>
+    </form>
+  </section>
+</main>
+<script>
+function addRow() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td><input type="text" name="track"></td><td><input type="number" name="amount" min="1" value="1"></td><td><button type="button" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+  document.getElementById('rows').appendChild(tr);
+}
+</script>
+</body>
+</html>
