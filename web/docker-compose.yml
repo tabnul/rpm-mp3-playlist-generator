@@ -1,0 +1,27 @@
+# Standalone compose file for the RPM playlist generator.
+# Runs next to (not inside) the Lyrion compose project.
+services:
+  rpm-playlists:
+    image: 'ghcr.io/tabnul/rpm-mp3-playlist-generator:latest'
+    restart: unless-stopped
+    user: '1003:1003'                     # same as Lyrion's PUID/PGID
+    ports:
+      - '8080:8080'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      TZ: 'Europe/Amsterdam'
+      TRACK_SUBDIR: ''                    # e.g. 'RPM' to only scan /music/RPM
+      LMS_URL: 'http://host.docker.internal:9000'   # Lyrion via its published port
+    volumes:
+      - music:/music:ro
+      - /path/to/lyrion/playlist:/playlist   # Lyrion's ./playlist folder (absolute path)
+      - ./data:/data                         # stores the class structure
+
+volumes:
+  music:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: '//data.localdomain/media/music'
+      o: 'credentials=/etc/rpm-playlists.cred,uid=1003,gid=1003,dir_mode=0755,file_mode=0644,noperm,ro'
