@@ -11,6 +11,7 @@
   body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
   main { max-width:860px; margin:0 auto; padding:16px; }
   h1 { font-size:1.4rem; margin:8px 0 16px; } h2 { font-size:1.05rem; margin:0 0 12px; }
+  .step { display:inline-block; width:1.6em; height:1.6em; line-height:1.6em; text-align:center; border-radius:50%; background:var(--accent); color:#fff; font-size:.85rem; margin-right:6px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
   label { display:block; color:var(--muted); font-size:.85rem; margin-bottom:4px; }
   input[type=text], input[type=number] { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
@@ -18,11 +19,14 @@
   .check { display:flex; align-items:center; gap:8px; color:var(--fg); font-size:.95rem; margin:10px 0 0; }
   button { font:inherit; padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  table { width:100%; border-collapse:collapse; } td, th { padding:4px 6px; text-align:left; } th { color:var(--muted); font-weight:500; font-size:.85rem; }
+  table { width:100%; border-collapse:collapse; } td, th { padding:4px 6px; text-align:left; vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; font-size:.85rem; }
+  td.num { width:90px; } td.avail { width:90px; color:var(--muted); font-size:.85rem; white-space:nowrap; } td.del { width:44px; }
+  td.avail.low { color:var(--warn); }
   .flash { padding:8px 12px; border-radius:6px; margin-bottom:12px; border:1px solid var(--line); }
   .flash.ok { color:var(--ok); } .flash.error, .warn { color:var(--warn); }
-  .playlists { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; }
-  .pl ol { margin:0; padding-left:20px; } .pl li span { color:var(--muted); }
+  .playlists { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+  .pl ol { margin:4px 0 0; padding-left:22px; } .pl li span { color:var(--muted); }
   .muted { color:var(--muted); }
 </style>
 </head>
@@ -35,14 +39,38 @@
   {% endwith %}
 
   <section class="card">
-    <h2>Generate</h2>
+    <h2><span class="step">1</span>Class structure</h2>
+    <p class="muted">The phases of each workout, in playing order. <strong>Track</strong> is the number your files start with,
+      <strong>Amount</strong> is how many songs of that phase each playlist gets (e.g. 2 × Intervals for a longer workout).</p>
+    <form method="post" action="/structure">
+      <table>
+        <thead><tr><th>Track</th><th>Phase</th><th>Amount</th><th>In library</th><th></th></tr></thead>
+        <tbody id="rows">
+          {% for r in structure %}
+          <tr>
+            <td class="num"><input type="text" name="track" value="{{ r.track }}"></td>
+            <td><input type="text" name="name" value="{{ r.name }}" placeholder="e.g. Intervals"></td>
+            <td class="num"><input type="number" name="amount" min="1" value="{{ r.amount }}"></td>
+            <td class="avail{% if r.available is defined and r.available < r.amount %} low{% endif %}">{% if r.available is defined %}{{ r.available }} songs{% endif %}</td>
+            <td class="del"><button type="button" title="Remove" onclick="this.closest('tr').remove()">✕</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted">{{ total }} songs per playlist.</p>
+      <p><button type="button" onclick="addRow()">+ Add phase</button> <button type="submit">Save structure</button></p>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span>Generate</h2>
     <form method="post" action="/generate">
       <div class="row">
         <div><label for="count">Number of playlists</label><input id="count" name="count" type="number" min="1" max="999" value="15"></div>
         <div><label for="prefix">Name prefix</label><input id="prefix" name="prefix" type="text" value="RPM"></div>
       </div>
       <label class="check"><input type="checkbox" name="replace" value="1" checked> Replace existing playlists with this prefix (otherwise add new ones)</label>
-      <label class="check"><input type="checkbox" name="rescan" value="1" checked> Ask Lyrion to rescan playlists afterwards</label>
+      <label class="check"><input type="checkbox" name="rescan" value="1" checked> Ask Lyrion to rescan afterwards</label>
       <p><button class="primary" type="submit">Generate playlists</button></p>
     </form>
     {% if playlists %}<p class="muted">Existing: {{ playlists|join(", ") }}</p>{% endif %}
@@ -56,33 +84,21 @@
     <div class="playlists">
       {% for pl in results %}
       <div class="pl"><strong>{{ pl.name }}</strong>
-        <ol>{% for t in pl.tracks %}<li><span>{{ t.slot }}</span> {{ t.name }}</li>{% endfor %}</ol>
+        <ol>{% for t in pl.tracks %}<li><span>{{ t.phase or t.slot }}:</span> {{ t.name }}</li>{% endfor %}</ol>
       </div>
       {% endfor %}
     </div>
   </section>
   {% endif %}
-
-  <section class="card">
-    <h2>Class structure</h2>
-    <p class="muted">Track number (file names must start with it) and how many tracks to pick, in playing order.</p>
-    <form method="post" action="/structure">
-      <table>
-        <thead><tr><th>Track</th><th>Amount</th><th></th></tr></thead>
-        <tbody id="rows">
-          {% for r in structure %}
-          <tr><td><input type="text" name="track" value="{{ r.track }}"></td><td><input type="number" name="amount" min="1" value="{{ r.amount }}"></td><td><button type="button" onclick="this.closest('tr').remove()">✕</button></td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <p><button type="button" onclick="addRow()">+ Add row</button> <button type="submit">Save structure</button></p>
-    </form>
-  </section>
 </main>
 <script>
 function addRow() {
   const tr = document.createElement('tr');
-  tr.innerHTML = '<td><input type="text" name="track"></td><td><input type="number" name="amount" min="1" value="1"></td><td><button type="button" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+  tr.innerHTML = '<td class="num"><input type="text" name="track"></td>'
+    + '<td><input type="text" name="name" placeholder="e.g. Intervals"></td>'
+    + '<td class="num"><input type="number" name="amount" min="1" value="1"></td>'
+    + '<td class="avail"></td>'
+    + '<td class="del"><button type="button" title="Remove" onclick="this.closest(\'tr\').remove()">✕</button></td>';
   document.getElementById('rows').appendChild(tr);
 }
 </script>

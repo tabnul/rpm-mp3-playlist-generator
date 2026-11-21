@@ -18,7 +18,10 @@ AUDIO_EXT = {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".wma", "
 
 STRUCTURE_FILE = DATA_DIR / "structure.csv"
 # Default RPM class: 5 (interval) and 6 (sprint) twice for a longer workout.
-DEFAULT_STRUCTURE = [{"track": str(n), "amount": 2 if n in (5, 6) else 1} for n in range(1, 10)]
+PHASE_NAMES = {"1": "Warm-up", "2": "Pace", "3": "Hills", "4": "Mixed terrain", "5": "Intervals",
+               "6": "Sprints", "7": "Climb", "8": "Ride home", "9": "Cool-down"}
+DEFAULT_STRUCTURE = [{"track": str(n), "amount": 2 if n in (5, 6) else 1, "name": PHASE_NAMES[str(n)]}
+                     for n in range(1, 10)]
 
 app = Flask(__name__)
 app.logger.setLevel("INFO")
@@ -29,16 +32,17 @@ app.secret_key = os.environ.get("SECRET_KEY", "rpm-playlist-generator")
 
 def load_structure():
     if not STRUCTURE_FILE.exists():
-        return list(DEFAULT_STRUCTURE)
+        return [dict(r) for r in DEFAULT_STRUCTURE]
     with STRUCTURE_FILE.open(newline="", encoding="utf-8-sig") as f:
-        return [{"track": r["track"].strip(), "amount": int(r["amount"])}
+        return [{"track": r["track"].strip(), "amount": int(r["amount"]),
+                 "name": (r.get("name") or PHASE_NAMES.get(r["track"].strip(), "")).strip()}
                 for r in csv.DictReader(f) if r.get("track", "").strip()]
 
 
 def save_structure(rows):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with STRUCTURE_FILE.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["track", "amount"])
+        w = csv.DictWriter(f, fieldnames=["track", "amount", "name"])
         w.writeheader()
         w.writerows(rows)
 
@@ -48,6 +52,11 @@ def save_structure(rows):
 def scan_tracks():
     root = MUSIC_DIR / TRACK_SUBDIR if TRACK_SUBDIR else MUSIC_DIR
     return [p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in AUDIO_EXT]
+
+
+def slot_tracks(files, slot):
+    rx = re.compile(rf"^{re.escape(slot)}(\D|$)")
+    return [p for p in files if rx.match(p.name)]
 
 
 def existing_playlists(prefix):
@@ -81,14 +90,13 @@ def generate(count, prefix, replace):
         picked = []
         for row in structure:
             slot, amount = row["track"], row["amount"]
-            rx = re.compile(rf"^{re.escape(slot)}(\D|$)")
-            candidates = [p for p in files if rx.match(p.name) and p.name not in used]
+            candidates = [p for p in slot_tracks(files, slot) if p.name not in used]
             if len(candidates) < amount:
                 warnings.append(f"{name}, track {slot}: only {len(candidates)} unused tracks left (need {amount})")
             for p in random.sample(candidates, min(amount, len(candidates))):
                 used.add(p.name)
                 lines += [f"#EXTINF:-1,{p.stem}", str(p)]
-                picked.append({"slot": slot, "name": p.stem})
+                picked.append({"slot": slot, "phase": row.get("name", ""), "name": p.stem})
         (PLAYLIST_DIR / f"{name}.m3u").write_text("\n".join(lines) + "\n", encoding="utf-8")
         results.append({"name": name, "tracks": picked})
     return results, warnings, len(files)
@@ -111,21 +119,35 @@ def lms_rescan_playlists():
 
 # ---------- routes ----------
 
+def render_page(prefix="RPM", **extra):
+    structure = load_structure()
+    try:
+        files = scan_tracks()
+        for row in structure:
+            row["available"] = len(slot_tracks(files, row["track"]))
+    except OSError as e:
+        flash(f"Cannot scan music folder: {e}", "error")
+    return render_template("index.html", structure=structure,
+                           total=sum(r["amount"] for r in structure),
+                           playlists=[p.stem for _, p in existing_playlists(prefix)],
+                           lms_url=LMS_URL, **extra)
+
+
 @app.get("/")
 def index():
-    return render_template("index.html", structure=load_structure(),
-                           playlists=[p.stem for _, p in existing_playlists(request.args.get("prefix", "RPM"))],
-                           lms_url=LMS_URL)
+    return render_page()
 
 
 @app.post("/structure")
 def update_structure():
     rows = []
-    for track, amount in zip(request.form.getlist("track"), request.form.getlist("amount")):
+    tracks, amounts = request.form.getlist("track"), request.form.getlist("amount")
+    names = request.form.getlist("name") + [""] * len(tracks)
+    for track, amount, name in zip(tracks, amounts, names):
         track = track.strip()
         if track:
             try:
-                rows.append({"track": track, "amount": max(1, int(amount))})
+                rows.append({"track": track, "amount": max(1, int(amount)), "name": name.strip()})
             except ValueError:
                 flash(f"Invalid amount for track {track}", "error")
                 return redirect(url_for("index"))
@@ -148,10 +170,7 @@ def do_generate():
         except Exception as e:  # noqa: BLE001
             rescan_msg = f"Lyrion rescan failed ({LMS_URL}): {e}"
             app.logger.error(rescan_msg)
-    return render_template("index.html", structure=load_structure(),
-                           playlists=[p.stem for _, p in existing_playlists(prefix)],
-                           results=results, warnings=warnings, scanned=scanned,
-                           rescan_msg=rescan_msg, lms_url=LMS_URL)
+    return render_page(prefix, results=results, warnings=warnings, scanned=scanned, rescan_msg=rescan_msg)
 
 
 if __name__ == "__main__":
