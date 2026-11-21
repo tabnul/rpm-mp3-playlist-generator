@@ -2,7 +2,7 @@
 # Runs next to (not inside) the Lyrion compose project.
 services:
   rpm-playlists:
-    image: 'ghcr.io/tabnul/rpm-mp3-playlist-generator:latest'
+    image: 'ghcr.io/tabnul/rpm-mp3-playlist-generator:1.0'   # or :latest (newest release), :edge (main branch)
     restart: unless-stopped
     user: '1003:1003'                     # same as Lyrion's PUID/PGID
     ports:

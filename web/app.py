@@ -14,6 +14,7 @@ TRACK_SUBDIR = os.environ.get("TRACK_SUBDIR", "")  # e.g. "RPM" -> scans /music/
 PLAYLIST_DIR = Path(os.environ.get("PLAYLIST_DIR", "/playlist"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 LMS_URL = os.environ.get("LMS_URL", "http://lyrion-app:9000")
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
 AUDIO_EXT = {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".wma", ".aiff", ".aif"}
 
 STRUCTURE_FILE = DATA_DIR / "structure.csv"
@@ -130,7 +131,7 @@ def render_page(prefix="RPM", **extra):
     return render_template("index.html", structure=structure,
                            total=sum(r["amount"] for r in structure),
                            playlists=[p.stem for _, p in existing_playlists(prefix)],
-                           lms_url=LMS_URL, **extra)
+                           lms_url=LMS_URL, version=APP_VERSION, **extra)
 
 
 @app.get("/")

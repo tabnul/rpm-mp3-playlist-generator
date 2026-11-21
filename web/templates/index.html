@@ -32,7 +32,7 @@
 </head>
 <body>
 <main>
-  <h1>RPM Playlist Generator</h1>
+  <h1>RPM Playlist Generator <small class="muted" style="font-size:.8rem;font-weight:400">v{{ version }}</small></h1>
 
   {% with msgs = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in msgs %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
