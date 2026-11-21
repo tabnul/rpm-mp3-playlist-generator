@@ -14,14 +14,7 @@ services:
       TRACK_SUBDIR: ''                    # e.g. 'RPM' to only scan /music/RPM
       LMS_URL: 'http://host.docker.internal:9000'   # Lyrion via its published port
     volumes:
-      - music:/music:ro
-      - /path/to/lyrion/playlist:/playlist   # Lyrion's ./playlist folder (absolute path)
+      # Mount at /music: the same path Lyrion uses, so playlist entries resolve in LMS.
+      - /path/to/music:/music:ro
+      - /path/to/lyrion/playlist:/playlist   # Lyrion's ./playlist folder
       - ./data:/data                         # stores the class structure
-
-volumes:
-  music:
-    driver: local
-    driver_opts:
-      type: cifs
-      device: '//data.localdomain/media/music'
-      o: 'credentials=/etc/rpm-playlists.cred,uid=1003,gid=1003,dir_mode=0755,file_mode=0644,noperm,ro'
