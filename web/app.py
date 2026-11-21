@@ -13,7 +13,7 @@ MUSIC_DIR = Path(os.environ.get("MUSIC_DIR", "/music"))
 TRACK_SUBDIR = os.environ.get("TRACK_SUBDIR", "")  # e.g. "RPM" -> scans /music/RPM
 PLAYLIST_DIR = Path(os.environ.get("PLAYLIST_DIR", "/playlist"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
-LMS_URL = os.environ.get("LMS_URL", "http://lyrion-app:9000")
+LMS_URL = os.environ.get("LMS_URL", "http://lyrion-app:9000").rstrip("/")
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 AUDIO_EXT = {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".wma", ".aiff", ".aif"}
 
@@ -108,7 +108,12 @@ def lms_request(*command):
     req = urllib.request.Request(f"{LMS_URL}/jsonrpc.js", data=payload,
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=5) as resp:
-        return json.loads(resp.read() or b"{}")
+        body = resp.read()
+    try:
+        return json.loads(body or b"{}")
+    except ValueError:
+        snippet = body[:120].decode("utf-8", "replace").strip()
+        raise RuntimeError(f"no JSON reply from {LMS_URL}/jsonrpc.js (is this the LMS address?): {snippet!r}")
 
 
 def lms_rescan_playlists():
