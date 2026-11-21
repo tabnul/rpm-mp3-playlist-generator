@@ -17,7 +17,8 @@ LMS_URL = os.environ.get("LMS_URL", "http://lyrion-app:9000")
 AUDIO_EXT = {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".wma", ".aiff", ".aif"}
 
 STRUCTURE_FILE = DATA_DIR / "structure.csv"
-DEFAULT_STRUCTURE = [{"track": str(n), "amount": 1} for n in range(1, 11)]
+# Default RPM class: 5 (interval) and 6 (sprint) twice for a longer workout.
+DEFAULT_STRUCTURE = [{"track": str(n), "amount": 2 if n in (5, 6) else 1} for n in range(1, 10)]
 
 app = Flask(__name__)
 app.logger.setLevel("INFO")
