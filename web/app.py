@@ -20,6 +20,7 @@ STRUCTURE_FILE = DATA_DIR / "structure.csv"
 DEFAULT_STRUCTURE = [{"track": str(n), "amount": 1} for n in range(1, 11)]
 
 app = Flask(__name__)
+app.logger.setLevel("INFO")
 app.secret_key = os.environ.get("SECRET_KEY", "rpm-playlist-generator")
 
 
@@ -92,11 +93,19 @@ def generate(count, prefix, replace):
     return results, warnings, len(files)
 
 
-def lms_rescan_playlists():
-    payload = json.dumps({"id": 1, "method": "slim.request", "params": ["", ["rescan", "playlists"]]}).encode()
+def lms_request(*command):
+    payload = json.dumps({"id": 1, "method": "slim.request", "params": ["", list(command)]}).encode()
     req = urllib.request.Request(f"{LMS_URL}/jsonrpc.js", data=payload,
                                  headers={"Content-Type": "application/json"})
-    urllib.request.urlopen(req, timeout=5).read()
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        return json.loads(resp.read() or b"{}")
+
+
+def lms_rescan_playlists():
+    # A normal (changes-only) rescan reliably picks up new and modified playlist files;
+    # "rescan playlists" can miss replaced files with unchanged names.
+    lms_request("rescan")
+    app.logger.info("Lyrion rescan requested at %s", LMS_URL)
 
 
 # ---------- routes ----------
@@ -136,7 +145,8 @@ def do_generate():
             lms_rescan_playlists()
             rescan_msg = "Lyrion playlist rescan started"
         except Exception as e:  # noqa: BLE001
-            rescan_msg = f"Lyrion rescan failed: {e}"
+            rescan_msg = f"Lyrion rescan failed ({LMS_URL}): {e}"
+            app.logger.error(rescan_msg)
     return render_template("index.html", structure=load_structure(),
                            playlists=[p.stem for _, p in existing_playlists(prefix)],
                            results=results, warnings=warnings, scanned=scanned,
